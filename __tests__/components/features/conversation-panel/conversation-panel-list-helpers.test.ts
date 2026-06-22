@@ -337,7 +337,9 @@ describe("conversation-panel-list-helpers", () => {
     // Override beats the FINISHED→in_review fallback...
     expect(getConversationStatusBucket(finished, getOverride)).toBe("done");
     // ...and beats an explicit server tag.
-    expect(getConversationStatusBucket(tagged, getOverride)).toBe("in_progress");
+    expect(getConversationStatusBucket(tagged, getOverride)).toBe(
+      "in_progress",
+    );
     // No override → computed bucket is unchanged.
     expect(getConversationStatusBucket(finished)).toBe("in_review");
 
@@ -373,13 +375,16 @@ describe("conversation-panel-list-helpers", () => {
       title: "c",
       selected_workspace: "/projects/internal-spotty",
     };
-    const labels = { emptyWorkspace: "No workspace", emptyRepository: "No repo" };
+    const labels = {
+      emptyWorkspace: "No workspace",
+      emptyRepository: "No repo",
+    };
 
     const options = deriveRepoFilterOptions([a, b, c], "local", labels);
     expect(
-      options.map((option) => ({ id: option.id, count: option.count })).sort(
-        (x, y) => x.id.localeCompare(y.id),
-      ),
+      options
+        .map((option) => ({ id: option.id, count: option.count }))
+        .sort((x, y) => x.id.localeCompare(y.id)),
     ).toEqual([
       { id: "ws:/projects/internal-spotty", count: 1 },
       { id: "ws:/projects/spotwise-ui", count: 2 },

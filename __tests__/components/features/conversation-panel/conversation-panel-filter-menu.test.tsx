@@ -67,7 +67,11 @@ describe("ConversationPanelFilterMenu", () => {
       filterMenuOpen: true,
       repoOptions: [
         { id: "ws:/projects/spotwise-ui", label: "spotwise-ui", count: 3 },
-        { id: "ws:/projects/internal-spotty", label: "internal-spotty", count: 1 },
+        {
+          id: "ws:/projects/internal-spotty",
+          label: "internal-spotty",
+          count: 1,
+        },
       ],
     });
 
@@ -76,7 +80,9 @@ describe("ConversationPanelFilterMenu", () => {
     expect(repoRow).toBeInTheDocument();
 
     await user.click(repoRow);
-    expect(props.setRepoFilter).toHaveBeenCalledWith("ws:/projects/spotwise-ui");
+    expect(props.setRepoFilter).toHaveBeenCalledWith(
+      "ws:/projects/spotwise-ui",
+    );
     expect(props.setFilterMenuOpen).toHaveBeenCalledWith(false);
   });
 
