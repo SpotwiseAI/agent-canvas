@@ -40,6 +40,8 @@ import {
   applyGroupFolderOrder,
   bucketConversationGroupsByStatus,
   bucketConversationsByStatus,
+  deriveRepoFilterOptions,
+  filterConversationsByRepo,
   filterOutPinnedConversations,
   groupConversations,
   partitionArchivedConversations,
@@ -161,6 +163,12 @@ export function ConversationPanel({
   );
   const setConversationSort = useConversationPanelPreferencesStore(
     (state) => state.setConversationSort,
+  );
+  const repoFilter = useConversationPanelPreferencesStore(
+    (state) => state.repoFilter,
+  );
+  const setRepoFilter = useConversationPanelPreferencesStore(
+    (state) => state.setRepoFilter,
   );
   const threadScope = useConversationPanelPreferencesStore(
     (state) => state.threadScope,
@@ -321,9 +329,22 @@ export function ConversationPanel({
       [conversations, archivedIds],
     );
 
+  // The "Repo" filter narrows the (non-archived) list to one workspace/repo.
+  // Options are derived from the unfiltered active set so every repo stays
+  // selectable regardless of the current filter.
+  const repoVisibleConversations = React.useMemo(
+    () =>
+      filterConversationsByRepo(
+        activeConversations,
+        activeBackend.kind,
+        repoFilter,
+      ),
+    [activeConversations, activeBackend.kind, repoFilter],
+  );
+
   const pinnedConversations = React.useMemo(
-    () => resolvePinnedConversations(pinnedIds, activeConversations),
-    [activeConversations, pinnedIds],
+    () => resolvePinnedConversations(pinnedIds, repoVisibleConversations),
+    [repoVisibleConversations, pinnedIds],
   );
 
   React.useEffect(() => {
@@ -354,10 +375,10 @@ export function ConversationPanel({
   const scopedConversations = React.useMemo(() => {
     const scopeFiltered =
       threadScope === "relevant"
-        ? activeConversations.filter((c) =>
+        ? repoVisibleConversations.filter((c) =>
             isExecutionActive(c.execution_status),
           )
-        : activeConversations;
+        : repoVisibleConversations;
 
     // In the expanded panel, pinned conversations should only appear inside
     // the dedicated pinned section (not duplicated in grouped/flat lists).
@@ -366,7 +387,7 @@ export function ConversationPanel({
     }
 
     return filterOutPinnedConversations(scopeFiltered, pinnedIds);
-  }, [compact, activeConversations, pinnedIds, threadScope]);
+  }, [compact, repoVisibleConversations, pinnedIds, threadScope]);
 
   const { recent: recentScoped, older: olderScoped } = React.useMemo(
     () => partitionByCutoff(scopedConversations),
@@ -393,6 +414,28 @@ export function ConversationPanel({
     }),
     [t],
   );
+
+  const repoOptions = React.useMemo(
+    () =>
+      deriveRepoFilterOptions(
+        activeConversations,
+        activeBackend.kind,
+        groupLabels,
+      ),
+    [activeConversations, activeBackend.kind, groupLabels],
+  );
+
+  // If the selected repo filter no longer matches any conversation (its
+  // conversations were deleted/archived, or the backend switched), fall back
+  // to "all" so the list doesn't silently render empty.
+  React.useEffect(() => {
+    if (
+      repoFilter !== "all" &&
+      !repoOptions.some((option) => option.id === repoFilter)
+    ) {
+      setRepoFilter("all");
+    }
+  }, [repoFilter, repoOptions, setRepoFilter]);
 
   const conversationGroups = React.useMemo(() => {
     if (compact || organizeMode !== "grouped") {
@@ -901,6 +944,9 @@ export function ConversationPanel({
                 setOrganizeMode={setOrganizeMode}
                 conversationSort={conversationSort}
                 setConversationSort={setConversationSort}
+                repoFilter={repoFilter}
+                setRepoFilter={setRepoFilter}
+                repoOptions={repoOptions}
                 threadScope={threadScope}
                 setThreadScope={setThreadScope}
                 showOlderConversations={showOlderConversations}

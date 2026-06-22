@@ -1,6 +1,5 @@
 import { cn } from "#/utils/utils";
 import { ChatInterfaceWrapper } from "./chat-interface-wrapper";
-import { ConversationCommandPalette } from "./conversation-command-palette";
 import { ConversationTabContent } from "../conversation-tabs/conversation-tab-content/conversation-tab-content";
 import { ConversationNameWithStatus } from "../conversation-name-with-status";
 import { ConversationTabs } from "../conversation-tabs/conversation-tabs";
@@ -43,7 +42,7 @@ export function ConversationMain() {
       <div
         ref={containerRef}
         className={cn(
-          "relative flex flex-1 overflow-hidden",
+          "flex flex-1 overflow-hidden",
           isMobile ? "flex-col" : "transition-all duration-300 ease-in-out",
         )}
         // transition toggled at runtime based on drag state
@@ -89,9 +88,6 @@ export function ConversationMain() {
             />
           </div>
         </div>
-
-        {/* Codex-style launcher rail — only while the right panel is collapsed */}
-        {!isMobile && <ConversationCommandPalette />}
 
         {/* Resize Handle - only shown on desktop when right panel is visible */}
         {!isMobile && isRightPanelShown && (

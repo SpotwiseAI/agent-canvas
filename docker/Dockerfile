@@ -128,6 +128,7 @@ RUN chmod +x /opt/agent-canvas/entrypoint.sh
 RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
              /home/openhands/.openhands/agent-canvas/bash_events \
              /home/openhands/.openhands/automation \
+             /home/openhands/.openhands/repos \
              /projects && \
     chown -R openhands:openhands /home/openhands/.openhands /projects
 

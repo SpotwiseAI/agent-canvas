@@ -3,6 +3,8 @@ import {
   applyGroupFolderOrder,
   bucketConversationGroupsByStatus,
   bucketConversationsByStatus,
+  deriveRepoFilterOptions,
+  filterConversationsByRepo,
   getConversationStatusBucket,
   getGroupConversationPreview,
   groupConversations,
@@ -350,6 +352,52 @@ describe("conversation-panel-list-helpers", () => {
       { id: "in_progress", ids: ["tagged"] },
       { id: "done", ids: ["finished"] },
     ]);
+  });
+
+  it("derives repo filter options and filters by repo/workspace", () => {
+    const a: AppConversation = {
+      ...base,
+      id: "a",
+      title: "a",
+      selected_workspace: "/projects/spotwise-ui",
+    };
+    const b: AppConversation = {
+      ...base,
+      id: "b",
+      title: "b",
+      selected_workspace: "/projects/spotwise-ui",
+    };
+    const c: AppConversation = {
+      ...base,
+      id: "c",
+      title: "c",
+      selected_workspace: "/projects/internal-spotty",
+    };
+    const labels = { emptyWorkspace: "No workspace", emptyRepository: "No repo" };
+
+    const options = deriveRepoFilterOptions([a, b, c], "local", labels);
+    expect(
+      options.map((option) => ({ id: option.id, count: option.count })).sort(
+        (x, y) => x.id.localeCompare(y.id),
+      ),
+    ).toEqual([
+      { id: "ws:/projects/internal-spotty", count: 1 },
+      { id: "ws:/projects/spotwise-ui", count: 2 },
+    ]);
+
+    expect(
+      filterConversationsByRepo(
+        [a, b, c],
+        "local",
+        "ws:/projects/spotwise-ui",
+      ).map((conversation) => conversation.id),
+    ).toEqual(["a", "b"]);
+
+    expect(
+      filterConversationsByRepo([a, b, c], "local", "all").map(
+        (conversation) => conversation.id,
+      ),
+    ).toEqual(["a", "b", "c"]);
   });
 
   it("places a workspace group in the highest-priority status it contains", () => {

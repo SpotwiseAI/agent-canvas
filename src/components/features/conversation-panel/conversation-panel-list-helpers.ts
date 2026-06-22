@@ -414,6 +414,53 @@ export function groupConversations(
   return groups;
 }
 
+/** Stable repo/workspace identifier used to group and filter a conversation. */
+export function getConversationRepoId(
+  conversation: AppConversation,
+  backendKind: BackendKind,
+): string {
+  return backendKind === "local"
+    ? workspaceGroup(conversation).id
+    : repositoryGroup(conversation).id;
+}
+
+export const REPO_FILTER_ALL = "all";
+
+export interface RepoFilterOption {
+  id: string;
+  label: string;
+  count: number;
+}
+
+/** Distinct repos/workspaces present in the list, for the "Repo" filter. */
+export function deriveRepoFilterOptions(
+  conversations: readonly AppConversation[],
+  backendKind: BackendKind,
+  labels: { emptyWorkspace: string; emptyRepository: string },
+): RepoFilterOption[] {
+  return groupConversations(conversations, backendKind, "updated", labels).map(
+    (group) => ({
+      id: group.id,
+      label: group.label,
+      count: group.conversations.length,
+    }),
+  );
+}
+
+export function filterConversationsByRepo(
+  conversations: readonly AppConversation[],
+  backendKind: BackendKind,
+  repoFilter: string,
+): AppConversation[] {
+  if (repoFilter === REPO_FILTER_ALL) {
+    return [...conversations];
+  }
+  return conversations.filter(
+    (conversation) =>
+      getConversationRepoId(conversation, backendKind) === repoFilter,
+  );
+}
+
 export function applyGroupFolderOrder<T extends { id: string }>(
   groups: readonly T[],
   order: readonly string[],
