@@ -1,10 +1,15 @@
 import { cn } from "#/utils/utils";
 import type { ConversationStatusBucketId } from "./conversation-panel-list-helpers";
 
+// Fixed workflow-state colors, theme-independent on purpose — the same way
+// Linear/Conductor keep status hues stable across light/dark. We can't lean on
+// `--oh-warning` here: the active themes repurpose it to white/near-black (see
+// color-themes.ts), so it renders the in-progress glyph colorless. Greens match
+// the `--oh-status-success` (#1FBD53) used by the per-conversation status dots.
 const BUCKET_COLOR: Record<ConversationStatusBucketId, string> = {
-  in_progress: "var(--oh-warning)",
-  in_review: "var(--oh-status-success)",
-  done: "var(--oh-status-success)",
+  in_progress: "#E0A82E",
+  in_review: "#1FBD53",
+  done: "#1FBD53",
 };
 
 // Linear/Conductor-style progress glyph: a thin outer ring with a solid pie
@@ -32,19 +37,25 @@ export function StatusBucketIcon({
   const color = BUCKET_COLOR[bucketId];
   const svgClass = cn("h-3.5 w-3.5 shrink-0", className);
 
+  // Drive the glyph color through `currentColor` set via inline `style`: CSS
+  // custom properties (`var(--oh-…)`) resolve in `style`/`color` but NOT in
+  // SVG presentation attributes like `stroke="var(--oh-…)"`, which silently
+  // fall back to near-black. Keeping the color on the element and painting
+  // with `currentColor` is the var()-safe path.
   if (bucketId === "done") {
     return (
       <svg
         data-testid={`status-bucket-icon-${bucketId}`}
         viewBox="0 0 14 14"
         className={svgClass}
+        style={{ color }}
         aria-hidden
       >
-        <circle cx="7" cy="7" r="6" fill={color} />
+        <circle cx="7" cy="7" r="6" fill="currentColor" />
         <path
           d="M4.3 7.2 6.1 9 9.8 4.9"
           fill="none"
-          stroke="var(--oh-surface)"
+          style={{ stroke: "var(--oh-surface)" }}
           strokeWidth="1.6"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -59,6 +70,7 @@ export function StatusBucketIcon({
       data-testid={`status-bucket-icon-${bucketId}`}
       viewBox="0 0 14 14"
       className={svgClass}
+      style={{ color }}
       aria-hidden
     >
       <circle
@@ -66,7 +78,7 @@ export function StatusBucketIcon({
         cy="7"
         r="5.25"
         fill="none"
-        stroke={color}
+        stroke="currentColor"
         strokeWidth="1.5"
       />
       <circle
@@ -74,7 +86,7 @@ export function StatusBucketIcon({
         cy="7"
         r={PIE_RADIUS}
         fill="none"
-        stroke={color}
+        stroke="currentColor"
         strokeWidth={PIE_RADIUS * 2}
         strokeDasharray={`${PIE_CIRCUMFERENCE * fraction} ${PIE_CIRCUMFERENCE}`}
         transform="rotate(-90 7 7)"
