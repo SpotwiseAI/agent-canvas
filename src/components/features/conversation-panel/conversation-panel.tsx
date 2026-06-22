@@ -33,6 +33,7 @@ import { ConversationPanelFilterMenu } from "./conversation-panel-filter-menu";
 import { ConversationPanelNewThreadPicker } from "./conversation-panel-new-thread-picker";
 import { ConversationGroupFolderList } from "./conversation-group-folder-list";
 import { ConversationPanelPinnedSection } from "./conversation-panel-pinned-section";
+import { StatusBucketIcon } from "./status-bucket-icon";
 import {
   applyGroupFolderOrder,
   bucketConversationGroupsByStatus,
@@ -751,6 +752,7 @@ export function ConversationPanel({
         data-testid={getStatusBucketTestId(bucketId)}
         className="flex items-center gap-2 px-2 pb-1 pt-3 text-xs font-semibold text-[var(--oh-muted)]"
       >
+        <StatusBucketIcon bucketId={bucketId} />
         <span>{t(STATUS_BUCKET_LABEL_KEYS[bucketId])}</span>
         <span className="rounded-full bg-[var(--oh-surface-raised)] px-1.5 py-px text-[10px] leading-4 text-[var(--oh-muted)]">
           {count}
