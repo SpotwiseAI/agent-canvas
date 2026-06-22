@@ -1,15 +1,16 @@
 import { cn } from "#/utils/utils";
 import type { ConversationStatusBucketId } from "./conversation-panel-list-helpers";
 
-// Fixed workflow-state colors, theme-independent on purpose — the same way
-// Linear/Conductor keep status hues stable across light/dark. We can't lean on
-// `--oh-warning` here: the active themes repurpose it to white/near-black (see
-// color-themes.ts), so it renders the in-progress glyph colorless. Greens match
-// the `--oh-status-success` (#1FBD53) used by the per-conversation status dots.
+// Workflow-state colors from the stable status token set. These tokens are
+// theme-independent (not overridden in color-themes.ts), the way Linear/
+// Conductor keep status hues constant across light/dark. Note: do NOT use
+// `--oh-warning` for amber — the themes repurpose it to white/near-black, which
+// is what made this glyph render colorless. Applied via `style`/`currentColor`
+// because `var()` does not resolve in SVG presentation attributes.
 const BUCKET_COLOR: Record<ConversationStatusBucketId, string> = {
-  in_progress: "#E0A82E",
-  in_review: "#1FBD53",
-  done: "#1FBD53",
+  in_progress: "var(--oh-status-warning)",
+  in_review: "var(--oh-status-success)",
+  done: "var(--oh-status-success)",
 };
 
 // Linear/Conductor-style progress glyph: a thin outer ring with a solid pie
