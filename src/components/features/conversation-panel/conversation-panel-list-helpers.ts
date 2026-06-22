@@ -1,10 +1,37 @@
 import type { AppConversation } from "#/api/conversation-service/agent-server-conversation-service.types";
 import type { BackendKind } from "#/api/backend-registry/types";
+import { ExecutionStatus } from "#/types/agent-server/core";
 import type { Provider } from "#/types/settings";
 
 export type ConversationSortField = "created" | "updated";
 export type ThreadScope = "all" | "relevant";
 export type OrganizeMode = "grouped" | "chronological";
+export type ConversationStatusBucketId = "in_progress" | "in_review" | "done";
+
+export const CONVERSATION_STATUS_BUCKET_ORDER: readonly ConversationStatusBucketId[] =
+  ["in_progress", "in_review", "done"];
+
+const STATUS_TAG_KEYS = ["status", "bucket"] as const;
+
+const DONE_STATUS_TAG_VALUES = new Set([
+  "done",
+  "complete",
+  "completed",
+  "closed",
+  "merged",
+]);
+
+const REVIEW_STATUS_TAG_VALUES = new Set([
+  "review",
+  "inreview",
+  "readyforreview",
+]);
+
+const PROGRESS_STATUS_TAG_VALUES = new Set([
+  "progress",
+  "inprogress",
+  "running",
+]);
 
 /** Max conversations shown under a workspace/repo folder before "View more". */
 export const GROUP_CONVERSATIONS_PREVIEW_LIMIT = 5;
@@ -55,6 +82,98 @@ export function getGroupConversationPreview(
     isPreviewTruncated: conversations.length > limit,
     isShowingAll: false,
   };
+}
+
+function normalizeStatusTagValue(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function getTaggedStatusBucket(
+  tags: AppConversation["tags"],
+): ConversationStatusBucketId | null {
+  for (const key of STATUS_TAG_KEYS) {
+    const value = tags?.[key];
+    if (!value) continue;
+
+    const normalized = normalizeStatusTagValue(value);
+    if (DONE_STATUS_TAG_VALUES.has(normalized)) {
+      return "done";
+    }
+    if (REVIEW_STATUS_TAG_VALUES.has(normalized)) {
+      return "in_review";
+    }
+    if (PROGRESS_STATUS_TAG_VALUES.has(normalized)) {
+      return "in_progress";
+    }
+  }
+
+  return null;
+}
+
+export function getConversationStatusBucket(
+  conversation: AppConversation,
+): ConversationStatusBucketId {
+  const tagged = getTaggedStatusBucket(conversation.tags);
+  if (tagged) {
+    return tagged;
+  }
+
+  // A finished coding run is ready for human inspection, not automatically
+  // complete. Explicit tags can move it to Done after review/merge.
+  if (conversation.execution_status === ExecutionStatus.FINISHED) {
+    return "in_review";
+  }
+
+  return "in_progress";
+}
+
+export function bucketConversationsByStatus(
+  conversations: readonly AppConversation[],
+): Array<{ id: ConversationStatusBucketId; conversations: AppConversation[] }> {
+  const buckets = new Map<ConversationStatusBucketId, AppConversation[]>(
+    CONVERSATION_STATUS_BUCKET_ORDER.map((id) => [id, []]),
+  );
+
+  for (const conversation of conversations) {
+    buckets.get(getConversationStatusBucket(conversation))?.push(conversation);
+  }
+
+  return CONVERSATION_STATUS_BUCKET_ORDER.map((id) => ({
+    id,
+    conversations: buckets.get(id) ?? [],
+  })).filter((bucket) => bucket.conversations.length > 0);
+}
+
+function getGroupStatusBucket(group: {
+  conversations: readonly AppConversation[];
+}): ConversationStatusBucketId {
+  const bucketIds = new Set(
+    group.conversations.map(getConversationStatusBucket),
+  );
+  return (
+    CONVERSATION_STATUS_BUCKET_ORDER.find((bucketId) =>
+      bucketIds.has(bucketId),
+    ) ?? "in_progress"
+  );
+}
+
+export function bucketConversationGroupsByStatus<
+  T extends { conversations: readonly AppConversation[] },
+>(
+  groups: readonly T[],
+): Array<{ id: ConversationStatusBucketId; groups: T[] }> {
+  const buckets = new Map<ConversationStatusBucketId, T[]>(
+    CONVERSATION_STATUS_BUCKET_ORDER.map((id) => [id, []]),
+  );
+
+  for (const group of groups) {
+    buckets.get(getGroupStatusBucket(group))?.push(group);
+  }
+
+  return CONVERSATION_STATUS_BUCKET_ORDER.map((id) => ({
+    id,
+    groups: buckets.get(id) ?? [],
+  })).filter((bucket) => bucket.groups.length > 0);
 }
 
 export function resolvePinnedConversations(

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   applyGroupFolderOrder,
+  bucketConversationGroupsByStatus,
+  bucketConversationsByStatus,
+  getConversationStatusBucket,
   getGroupConversationPreview,
   groupConversations,
   GROUP_CONVERSATIONS_PREVIEW_LIMIT,
@@ -269,6 +272,85 @@ describe("conversation-panel-list-helpers", () => {
     ).toEqual(["c", "a"]);
   });
 
+  it("derives Conductor-style status buckets from tags and execution status", () => {
+    const running: AppConversation = {
+      ...base,
+      id: "running",
+      title: "running",
+      execution_status: ExecutionStatus.RUNNING,
+    };
+    const finished: AppConversation = {
+      ...base,
+      id: "finished",
+      title: "finished",
+      execution_status: ExecutionStatus.FINISHED,
+    };
+    const explicitlyDone: AppConversation = {
+      ...base,
+      id: "done",
+      title: "done",
+      execution_status: ExecutionStatus.FINISHED,
+      tags: { status: "done" },
+    };
+
+    expect(getConversationStatusBucket(running)).toBe("in_progress");
+    expect(getConversationStatusBucket(finished)).toBe("in_review");
+    expect(getConversationStatusBucket(explicitlyDone)).toBe("done");
+    expect(
+      bucketConversationsByStatus([finished, explicitlyDone, running]).map(
+        (bucket) => ({
+          id: bucket.id,
+          ids: bucket.conversations.map((conversation) => conversation.id),
+        }),
+      ),
+    ).toEqual([
+      { id: "in_progress", ids: ["running"] },
+      { id: "in_review", ids: ["finished"] },
+      { id: "done", ids: ["done"] },
+    ]);
+  });
+
+  it("places a workspace group in the highest-priority status it contains", () => {
+    const running: AppConversation = {
+      ...base,
+      id: "running",
+      title: "running",
+      execution_status: ExecutionStatus.RUNNING,
+      selected_workspace: "/projects/app",
+    };
+    const finished: AppConversation = {
+      ...base,
+      id: "finished",
+      title: "finished",
+      execution_status: ExecutionStatus.FINISHED,
+      selected_workspace: "/projects/app",
+    };
+    const done: AppConversation = {
+      ...base,
+      id: "done",
+      title: "done",
+      execution_status: ExecutionStatus.FINISHED,
+      tags: { status: "done" },
+      selected_workspace: "/projects/docs",
+    };
+    const groups = groupConversations(
+      [finished, done, running],
+      "local",
+      "updated",
+      { emptyWorkspace: "No workspace", emptyRepository: "No repository" },
+    );
+
+    expect(
+      bucketConversationGroupsByStatus(groups).map((bucket) => ({
+        id: bucket.id,
+        groupIds: bucket.groups.map((group) => group.id),
+      })),
+    ).toEqual([
+      { id: "in_progress", groupIds: ["ws:/projects/app"] },
+      { id: "done", groupIds: ["ws:/projects/docs"] },
+    ]);
+  });
+
   it("groups local conversations by selected_workspace, collapsing per-conversation worktree paths", () => {
     // Two worktree-mode conversations launched against the same workspace must
     // end up in a single group keyed off the user-selected workspace, not split
@@ -277,16 +359,20 @@ describe("conversation-panel-list-helpers", () => {
       ...base,
       id: "1",
       title: "one",
-      selected_workspace: "/workspace/agent-server-gui",
-      workspace: { working_dir: "/workspace/agent-server-gui/wt-abc" },
+      selected_workspace: "/projects/spotwise-self-serve-web",
+      workspace: {
+        working_dir: "/tmp/conversation-worktrees/1/spotwise-self-serve-web",
+      },
       updated_at: "2024-01-02T00:00:00.000Z",
     };
     const sameWsB: AppConversation = {
       ...base,
       id: "2",
       title: "two",
-      selected_workspace: "/workspace/agent-server-gui",
-      workspace: { working_dir: "/workspace/agent-server-gui/wt-def" },
+      selected_workspace: "/projects/spotwise-self-serve-web",
+      workspace: {
+        working_dir: "/tmp/conversation-worktrees/2/spotwise-self-serve-web",
+      },
       updated_at: "2024-01-04T00:00:00.000Z",
     };
     // Different workspace — its own group.
@@ -294,8 +380,8 @@ describe("conversation-panel-list-helpers", () => {
       ...base,
       id: "3",
       title: "three",
-      selected_workspace: "/workspace/other",
-      workspace: { working_dir: "/workspace/other/wt-xyz" },
+      selected_workspace: "/projects/other",
+      workspace: { working_dir: "/tmp/conversation-worktrees/3/other" },
       updated_at: "2024-01-03T00:00:00.000Z",
     };
     // No user-selected workspace — must bucket under "No workspace"
@@ -325,16 +411,16 @@ describe("conversation-panel-list-helpers", () => {
       })),
     ).toEqual([
       {
-        id: "ws:/workspace/agent-server-gui",
-        label: "agent-server-gui",
+        id: "ws:/projects/spotwise-self-serve-web",
+        label: "spotwise-self-serve-web",
         ids: ["2", "1"],
-        launch: { workingDir: "/workspace/agent-server-gui" },
+        launch: { workingDir: "/projects/spotwise-self-serve-web" },
       },
       {
-        id: "ws:/workspace/other",
+        id: "ws:/projects/other",
         label: "other",
         ids: ["3"],
-        launch: { workingDir: "/workspace/other" },
+        launch: { workingDir: "/projects/other" },
       },
       {
         id: "__none_workspace",

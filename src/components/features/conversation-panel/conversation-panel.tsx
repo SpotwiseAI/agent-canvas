@@ -35,11 +35,14 @@ import { ConversationGroupFolderList } from "./conversation-group-folder-list";
 import { ConversationPanelPinnedSection } from "./conversation-panel-pinned-section";
 import {
   applyGroupFolderOrder,
+  bucketConversationGroupsByStatus,
+  bucketConversationsByStatus,
   filterOutPinnedConversations,
   groupConversations,
   resolvePinnedConversations,
   sortConversationsByField,
   type ConversationGroupLaunch,
+  type ConversationStatusBucketId,
 } from "./conversation-panel-list-helpers";
 import { usePinnedConversationsStore } from "#/stores/pinned-conversations-store";
 
@@ -58,6 +61,15 @@ const noop = () => {};
 const EMPTY_PINNED_CONVERSATION_IDS: readonly string[] = [];
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
+
+const STATUS_BUCKET_LABEL_KEYS: Record<ConversationStatusBucketId, I18nKey> = {
+  in_progress: I18nKey.CONVERSATION_PANEL$STATUS_IN_PROGRESS,
+  in_review: I18nKey.CONVERSATION_PANEL$STATUS_IN_REVIEW,
+  done: I18nKey.CONVERSATION_PANEL$STATUS_DONE,
+};
+
+const getStatusBucketTestId = (bucketId: ConversationStatusBucketId) =>
+  `conversation-status-bucket-${bucketId.replace(/_/g, "-")}`;
 
 const partitionByCutoff = <T extends { updated_at: string }>(
   items: readonly T[],
@@ -348,6 +360,18 @@ export function ConversationPanel({
     }
     return applyGroupFolderOrder(conversationGroups, groupFolderOrder);
   }, [conversationGroups, groupFolderOrder]);
+
+  const groupedStatusBuckets = React.useMemo(() => {
+    if (!orderedConversationGroups) {
+      return null;
+    }
+    return bucketConversationGroupsByStatus(orderedConversationGroups);
+  }, [orderedConversationGroups]);
+
+  const chronologicalStatusBuckets = React.useMemo(
+    () => bucketConversationsByStatus(sortedVisibleConversations),
+    [sortedVisibleConversations],
+  );
 
   const conversationGroupIds = React.useMemo(
     () => conversationGroups?.map((group) => group.id) ?? [],
@@ -720,6 +744,21 @@ export function ConversationPanel({
 
   const showConversationHeader = !compact;
 
+  const renderStatusBucketHeader = React.useCallback(
+    (bucketId: ConversationStatusBucketId, count: number) => (
+      <div
+        data-testid={getStatusBucketTestId(bucketId)}
+        className="flex items-center gap-2 px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.13em] text-[var(--oh-muted)]"
+      >
+        <span>{t(STATUS_BUCKET_LABEL_KEYS[bucketId])}</span>
+        <span className="rounded-full bg-[var(--oh-surface-raised)] px-1.5 py-px text-[10px] leading-4 text-[var(--oh-muted)]">
+          {count}
+        </span>
+      </div>
+    ),
+    [t],
+  );
+
   return (
     <div
       ref={ref}
@@ -835,33 +874,50 @@ export function ConversationPanel({
         {!showInitialSkeleton &&
         !compact &&
         organizeMode === "grouped" &&
-        orderedConversationGroups &&
-        orderedConversationGroups.length > 0 ? (
-          <ConversationGroupFolderList
-            groups={orderedConversationGroups}
-            groupIds={conversationGroupIds}
-            groupFolderOrder={groupFolderOrder}
-            setGroupFolderOrder={setGroupFolderOrder}
-            collapsedGroupIds={collapsedGroupIds}
-            expandedGroupPreviewIds={expandedGroupPreviewIds}
-            onToggleGroupCollapsed={toggleGroupCollapsed}
-            onToggleGroupPreviewExpanded={toggleGroupPreviewExpanded}
-            isCreatingConversationFlow={isCreatingConversationFlow}
-            activeConversationId={currentConversationId}
-            onLaunchFromGroup={launchFromGroup}
-            renderConversationCard={(conversation) =>
-              renderConversationCard(conversation)
-            }
-          />
+        groupedStatusBuckets &&
+        groupedStatusBuckets.length > 0 ? (
+          <div className="space-y-2 pb-1">
+            {groupedStatusBuckets.map((bucket) => (
+              <section key={bucket.id}>
+                {renderStatusBucketHeader(bucket.id, bucket.groups.length)}
+                <ConversationGroupFolderList
+                  groups={bucket.groups}
+                  groupIds={conversationGroupIds}
+                  groupFolderOrder={groupFolderOrder}
+                  setGroupFolderOrder={setGroupFolderOrder}
+                  collapsedGroupIds={collapsedGroupIds}
+                  expandedGroupPreviewIds={expandedGroupPreviewIds}
+                  onToggleGroupCollapsed={toggleGroupCollapsed}
+                  onToggleGroupPreviewExpanded={toggleGroupPreviewExpanded}
+                  isCreatingConversationFlow={isCreatingConversationFlow}
+                  activeConversationId={currentConversationId}
+                  onLaunchFromGroup={launchFromGroup}
+                  renderConversationCard={(conversation) =>
+                    renderConversationCard(conversation)
+                  }
+                />
+              </section>
+            ))}
+          </div>
         ) : null}
 
         {!showInitialSkeleton &&
         !compact &&
         organizeMode === "chronological" ? (
-          <div className="space-y-0.5">
-            {sortedVisibleConversations.map((conversation) =>
-              renderConversationCard(conversation),
-            )}
+          <div className="space-y-2 pb-1">
+            {chronologicalStatusBuckets.map((bucket) => (
+              <section key={bucket.id}>
+                {renderStatusBucketHeader(
+                  bucket.id,
+                  bucket.conversations.length,
+                )}
+                <div className="space-y-0.5">
+                  {bucket.conversations.map((conversation) =>
+                    renderConversationCard(conversation),
+                  )}
+                </div>
+              </section>
+            ))}
           </div>
         ) : null}
 
