@@ -17118,6 +17118,23 @@
     "tr": "Hızlı başlangıç",
     "uk": "Швидкий старт"
   },
+  "CONVERSATION_PANEL$CREATE_MORE": {
+    "en": "Create more",
+    "ja": "続けて作成",
+    "zh-CN": "继续创建",
+    "zh-TW": "繼續建立",
+    "ko-KR": "계속 만들기",
+    "no": "Opprett flere",
+    "ar": "إنشاء المزيد",
+    "de": "Mehr erstellen",
+    "fr": "Créer plusieurs",
+    "it": "Crea altri",
+    "pt": "Criar mais",
+    "es": "Crear más",
+    "ca": "Crea'n més",
+    "tr": "Daha fazla oluştur",
+    "uk": "Створити ще"
+  },
   "CONVERSATION_PANEL$PINNED": {
     "en": "Pinned",
     "ja": "ピン留め",

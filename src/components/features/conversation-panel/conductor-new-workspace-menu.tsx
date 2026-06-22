@@ -2,8 +2,6 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Folder, FolderPlus, Globe, Plus } from "lucide-react";
 
-import { useCreateConversation } from "#/hooks/mutation/use-create-conversation";
-import { useNavigation } from "#/context/navigation-context";
 import { useIsCreatingConversation } from "#/hooks/use-is-creating-conversation";
 import { usePopoverFixedPlacement } from "#/hooks/use-popover-fixed-placement";
 import { I18nKey } from "#/i18n/declaration";
@@ -16,6 +14,10 @@ import {
 import { StyledTooltip } from "#/components/shared/buttons/styled-tooltip";
 import { OpenWorkspaceDialog } from "#/components/features/home/open-workspace-dialog";
 import { NEW_CONVERSATION_DROPDOWN_SURFACE } from "./new-conversation-dropdown-styles";
+import {
+  ConductorWorkspaceComposer,
+  type ComposerSource,
+} from "./conductor-workspace-composer";
 
 const triggerClassName = cn(
   "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
@@ -28,66 +30,54 @@ const triggerClassName = cn(
 /**
  * Conductor-style "+ New workspace" control for the conversation panel header.
  * Surfaces three entry points — open a local project, open a GitHub-App repo,
- * or quick-start a workspace-less conversation — and launches a conversation
- * directly from the chosen source.
+ * or quick-start a workspace-less conversation — then hands the chosen source
+ * to a composer popover that types the first task and creates the run.
  */
 export function ConductorNewWorkspaceMenu() {
   const { t } = useTranslation("openhands");
-  const { navigate } = useNavigation();
 
   const [open, setOpen] = React.useState(false);
   const [dialogSource, setDialogSource] = React.useState<
     "repo" | "workspace" | null
   >(null);
+  // `null` = composer closed; an object (whose `source` may itself be null for
+  // quick start) = composer open.
+  const [composer, setComposer] = React.useState<{
+    source: ComposerSource | null;
+  } | null>(null);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const triggerWrapRef = React.useRef<HTMLSpanElement>(null);
-  const fixedBox = usePopoverFixedPlacement(triggerWrapRef, {
-    open,
-    enabled: true,
-  });
-
-  const { mutate: createConversation, isPending } = useCreateConversation();
-  const isCreatingElsewhere = useIsCreatingConversation();
-  const isCreating = isPending || isCreatingElsewhere;
 
   const dialogOpen = dialogSource !== null;
+  const composerOpen = composer !== null;
+  const fixedBox = usePopoverFixedPlacement(triggerWrapRef, {
+    open: open || composerOpen,
+    enabled: true,
+    targetWidth: composerOpen ? 320 : 240,
+  });
+
+  const isCreating = useIsCreatingConversation();
 
   React.useEffect(() => {
-    if (!open || dialogOpen) return undefined;
+    if (!open || dialogOpen || composerOpen) return undefined;
     const onDown = (event: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open, dialogOpen]);
-
-  React.useEffect(() => {
-    if (!open || dialogOpen) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
+    document.addEventListener("mousedown", onDown);
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, dialogOpen]);
-
-  const launch = (workingDir?: string) => {
-    if (isCreating) return;
-    createConversation(
-      { workingDir },
-      {
-        onSuccess: (data) => {
-          setOpen(false);
-          setDialogSource(null);
-          navigate(`/conversations/${data.conversation_id}`);
-        },
-      },
-    );
-  };
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, dialogOpen, composerOpen]);
 
   const newWorkspaceLabel = t(I18nKey.CONVERSATION_PANEL$NEW_WORKSPACE);
-  const showPopover = open && fixedBox !== null;
+  const showMenu = open && !composerOpen && fixedBox !== null;
 
   const items: Array<{
     key: string;
@@ -119,7 +109,7 @@ export function ConductorNewWorkspaceMenu() {
       icon: <FolderPlus size={16} aria-hidden />,
       onSelect: () => {
         setOpen(false);
-        launch();
+        setComposer({ source: null });
       },
     },
   ];
@@ -143,7 +133,7 @@ export function ConductorNewWorkspaceMenu() {
         </StyledTooltip>
       </span>
 
-      {showPopover ? (
+      {showMenu ? (
         <div
           data-testid="conductor-new-workspace-popover"
           className={cn(NEW_CONVERSATION_DROPDOWN_SURFACE, "w-[240px]")}
@@ -177,11 +167,24 @@ export function ConductorNewWorkspaceMenu() {
         </div>
       ) : null}
 
+      {composerOpen && fixedBox !== null ? (
+        <ConductorWorkspaceComposer
+          source={composer.source}
+          anchor={{ top: fixedBox.top, left: fixedBox.left }}
+          onClose={() => setComposer(null)}
+        />
+      ) : null}
+
       <OpenWorkspaceDialog
         isOpen={dialogOpen}
         initialSource={dialogSource ?? undefined}
         onClose={() => setDialogSource(null)}
-        onConfirm={(workspace) => launch(workspace.path)}
+        onConfirm={(workspace) => {
+          setDialogSource(null);
+          setComposer({
+            source: { label: workspace.name, workingDir: workspace.path },
+          });
+        }}
       />
     </div>
   );

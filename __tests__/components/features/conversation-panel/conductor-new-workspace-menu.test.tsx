@@ -36,4 +36,19 @@ describe("ConductorNewWorkspaceMenu", () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId("local-repository-form")).toBeInTheDocument();
   });
+
+  it("opens the composer when quick start is chosen", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ConductorNewWorkspaceMenu />);
+
+    await user.click(screen.getByTestId("conductor-new-workspace-button"));
+    await user.click(screen.getByTestId("conductor-new-workspace-quick-start"));
+
+    expect(
+      screen.getByTestId("conductor-workspace-composer"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("conductor-workspace-composer-input"),
+    ).toBeInTheDocument();
+  });
 });
