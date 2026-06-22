@@ -34,6 +34,7 @@ import { ConversationPanelNewThreadPicker } from "./conversation-panel-new-threa
 import { ConversationGroupFolderList } from "./conversation-group-folder-list";
 import { ConversationPanelPinnedSection } from "./conversation-panel-pinned-section";
 import { StatusBucketIcon } from "./status-bucket-icon";
+import { ConductorNewWorkspaceMenu } from "./conductor-new-workspace-menu";
 import {
   applyGroupFolderOrder,
   bucketConversationGroupsByStatus,
@@ -785,6 +786,7 @@ export function ConversationPanel({
               {t(I18nKey.SIDEBAR$CONVERSATIONS)}
             </span>
             <div className="ml-auto flex shrink-0 items-center gap-0.5">
+              {activeBackend.kind === "local" && <ConductorNewWorkspaceMenu />}
               <ConversationPanelNewThreadPicker
                 backendKind={activeBackend.kind}
               />
