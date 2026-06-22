@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Folder, FolderOpen, Plus } from "lucide-react";
+import { FaCodeBranch } from "react-icons/fa";
 import { useRef, type DragEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppConversation } from "#/api/conversation-service/agent-server-conversation-service.types";
@@ -16,6 +17,27 @@ interface ConversationGroup {
   label: string;
   conversations: AppConversation[];
   launch: ConversationGroupLaunch;
+}
+
+/**
+ * The branch shared by every conversation in the folder, or null when they
+ * diverge. Showing a single branch chip is only meaningful when unambiguous;
+ * per-conversation branches still surface on each card's own footer.
+ */
+function sharedBranch(
+  conversations: readonly AppConversation[],
+): string | null {
+  let branch: string | null = null;
+  for (const conversation of conversations) {
+    const candidate = conversation.selected_branch?.trim();
+    if (!candidate) return null;
+    if (branch === null) {
+      branch = candidate;
+    } else if (branch !== candidate) {
+      return null;
+    }
+  }
+  return branch;
 }
 
 interface ConversationGroupFolderRowProps {
@@ -66,6 +88,8 @@ export function ConversationGroupFolderRow({
       expanded: previewExpanded,
       activeConversationId,
     });
+  const conversationCount = group.conversations.length;
+  const branch = sharedBranch(group.conversations);
 
   return (
     <motion.section
@@ -181,6 +205,22 @@ export function ConversationGroupFolderRow({
             />
             <span className="truncate">{group.label}</span>
           </button>
+          {branch ? (
+            <span
+              data-testid={`thread-folder-branch-${groupTestIdSuffix}`}
+              title={branch}
+              className="hidden min-w-0 max-w-[40%] items-center gap-1 rounded-full bg-[var(--oh-surface-raised)] px-1.5 py-px text-[11px] leading-4 text-[var(--oh-muted)] sm:inline-flex"
+            >
+              <FaCodeBranch size={10} className="shrink-0" aria-hidden />
+              <span className="truncate">{branch}</span>
+            </span>
+          ) : null}
+          <span
+            data-testid={`thread-folder-count-${groupTestIdSuffix}`}
+            className="shrink-0 rounded-full px-1 text-[11px] leading-4 text-[var(--oh-text-dim)] tabular-nums"
+          >
+            {conversationCount}
+          </span>
           <button
             type="button"
             className={cn(
