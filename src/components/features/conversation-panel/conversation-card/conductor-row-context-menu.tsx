@@ -130,7 +130,9 @@ export function ConductorRowContextMenu({
       position="none"
       spacing="none"
       style={style}
-      className="min-w-[220px] w-max max-w-[min(280px,100vw-16px)]"
+      // overflow-visible so the "Set status" submenu flyout (positioned
+      // left-full of its row) isn't clipped by the menu's rounded overflow.
+      className="min-w-[220px] w-max max-w-[min(280px,100vw-16px)] overflow-visible"
     >
       <Row
         testId="conductor-row-mark-unread"
