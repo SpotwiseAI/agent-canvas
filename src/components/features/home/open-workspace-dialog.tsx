@@ -45,7 +45,7 @@ export function OpenWorkspaceDialog({
         >
           <section className="flex flex-col gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-white">
+              <h3 className="text-sm font-semibold text-foreground">
                 {t(I18nKey.HOME$OPEN_LOCAL_REPOSITORY_TITLE)}
               </h3>
               <p className="text-xs text-[var(--oh-text-secondary)]">
@@ -70,7 +70,7 @@ export function OpenWorkspaceDialog({
 
           <section className="flex flex-col gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-white">
+              <h3 className="text-sm font-semibold text-foreground">
                 {t(I18nKey.HOME$OPEN_LOCAL_WORKSPACE_TITLE)}
               </h3>
               <p className="text-xs text-[var(--oh-text-secondary)]">

@@ -7,13 +7,17 @@ import { I18nKey } from "#/i18n/declaration";
 import { transformVSCodeUrl } from "#/utils/vscode-url-helper";
 import ConversationService from "#/api/conversation-service/conversation-service.api";
 import { ExecutionStatus } from "#/types/agent-server/core/base/common";
-import { SandboxStatus } from "#/api/conversation-service/agent-server-conversation-service.types";
+import {
+  SandboxStatus,
+  type AppConversation,
+} from "#/api/conversation-service/agent-server-conversation-service.types";
 import { RepositorySelection } from "#/api/open-hands.types";
 import { formatTimeDelta } from "#/utils/format-time-delta";
 import { ConversationCardHeader } from "./conversation-card-header";
 import { ConversationCardActions } from "./conversation-card-actions";
 import { ConversationCardFooter } from "./conversation-card-footer";
 import { ConversationStatusBadges } from "./conversation-status-badges";
+import { ConversationSourceBadges } from "./conversation-source-badges";
 import { useDownloadConversation } from "#/hooks/use-download-conversation";
 
 interface ConversationCardProps {
@@ -42,6 +46,8 @@ interface ConversationCardProps {
   onTogglePin?: () => void;
   /** When true and pinned, keep the pin icon visible without hovering. */
   alwaysShowPinIcon?: boolean;
+  /** Server-stamped tags; source/linear/requester render as provenance badges. */
+  tags?: AppConversation["tags"];
 }
 
 export function ConversationCard({
@@ -69,6 +75,7 @@ export function ConversationCard({
   isPinned = false,
   onTogglePin,
   alwaysShowPinIcon = false,
+  tags = null,
 }: ConversationCardProps) {
   const { t } = useTranslation("openhands");
   const { trackDownloadVsCodeButtonClicked } = useTracking();
@@ -164,7 +171,7 @@ export function ConversationCard({
       onClick={handleTogglePin}
       className={cn(
         "flex shrink-0 cursor-pointer items-center justify-center rounded-md p-1",
-        "text-[var(--oh-muted)] hover:bg-white/10 hover:text-white",
+        "text-[var(--oh-muted)] hover:bg-white/10 hover:text-foreground",
       )}
     >
       <Pin
@@ -300,6 +307,8 @@ export function ConversationCard({
           ) : null}
         </div>
       </div>
+
+      <ConversationSourceBadges tags={tags} className="mt-1 pl-[26px]" />
 
       {shouldRenderFooter && (
         <ConversationCardFooter

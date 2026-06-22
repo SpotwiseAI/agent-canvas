@@ -634,7 +634,7 @@ export function ConversationPanel({
             !showHoverMetadata || openContextMenuId === conversation.id
           }
           disableAnimation={import.meta.env.MODE === "test"}
-          className="rounded-xl border border-[var(--oh-border)] bg-base-secondary p-0 text-white shadow-xl"
+          className="rounded-xl border border-[var(--oh-border)] bg-base-secondary p-0 text-foreground shadow-xl"
           content={
             <ConversationCardPreview
               title={conversation.title ?? ""}
@@ -699,6 +699,7 @@ export function ConversationPanel({
               showLlmProfiles={showLlmProfiles}
               agentKind={conversation.agent_kind}
               acpServer={conversation.acp_server}
+              tags={conversation.tags}
               isPinned={isPinned}
               onTogglePin={() => togglePin(activeBackend.id, conversation.id)}
               alwaysShowPinIcon={isPinned && !options?.inPinnedSection}
@@ -748,7 +749,7 @@ export function ConversationPanel({
     (bucketId: ConversationStatusBucketId, count: number) => (
       <div
         data-testid={getStatusBucketTestId(bucketId)}
-        className="flex items-center gap-2 px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.13em] text-[var(--oh-muted)]"
+        className="flex items-center gap-2 px-2 pb-1 pt-3 text-xs font-semibold text-[var(--oh-muted)]"
       >
         <span>{t(STATUS_BUCKET_LABEL_KEYS[bucketId])}</span>
         <span className="rounded-full bg-[var(--oh-surface-raised)] px-1.5 py-px text-[10px] leading-4 text-[var(--oh-muted)]">
@@ -936,7 +937,7 @@ export function ConversationPanel({
                 type="button"
                 data-testid="load-more-conversations"
                 onClick={requestLoadMore}
-                className="text-xs text-[var(--oh-muted)] hover:text-white"
+                className="text-xs text-[var(--oh-muted)] hover:text-foreground"
               >
                 {t(I18nKey.CONVERSATION$LOAD_MORE)}
               </button>

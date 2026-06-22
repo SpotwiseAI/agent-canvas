@@ -211,7 +211,10 @@ function BackendStatusBadge({
         className="flex items-center gap-3 text-sm"
       >
         <BackendStatusDot isConnected={isConnected} />
-        <span className="text-white" data-testid={`${testIdRoot}-status-label`}>
+        <span
+          className="text-foreground"
+          data-testid={`${testIdRoot}-status-label`}
+        >
           {statusLabel}
         </span>
         <span className="text-tertiary-alt">·</span>
