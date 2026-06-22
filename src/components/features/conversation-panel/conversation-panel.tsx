@@ -33,6 +33,7 @@ import { ConversationPanelFilterMenu } from "./conversation-panel-filter-menu";
 import { ConversationPanelNewThreadPicker } from "./conversation-panel-new-thread-picker";
 import { ConversationGroupFolderList } from "./conversation-group-folder-list";
 import { ConversationPanelPinnedSection } from "./conversation-panel-pinned-section";
+import { Archive, ChevronDown, ChevronRight } from "lucide-react";
 import { StatusBucketIcon } from "./status-bucket-icon";
 import { ConductorNewWorkspaceMenu } from "./conductor-new-workspace-menu";
 import {
@@ -41,12 +42,17 @@ import {
   bucketConversationsByStatus,
   filterOutPinnedConversations,
   groupConversations,
+  partitionArchivedConversations,
   resolvePinnedConversations,
   sortConversationsByField,
   type ConversationGroupLaunch,
   type ConversationStatusBucketId,
+  type StatusOverrideAccessor,
 } from "./conversation-panel-list-helpers";
 import { usePinnedConversationsStore } from "#/stores/pinned-conversations-store";
+import { useArchivedConversationsStore } from "#/stores/archived-conversations-store";
+import { useUnreadConversationsStore } from "#/stores/unread-conversations-store";
+import { useConversationStatusOverrideStore } from "#/stores/conversation-status-override-store";
 
 interface ConversationPanelProps {
   onClose?: () => void;
@@ -61,6 +67,8 @@ interface ConversationPanelProps {
 const noop = () => {};
 
 const EMPTY_PINNED_CONVERSATION_IDS: readonly string[] = [];
+const EMPTY_CONVERSATION_IDS: readonly string[] = [];
+const EMPTY_STATUS_OVERRIDES: Record<string, ConversationStatusBucketId> = {};
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -179,6 +187,8 @@ export function ConversationPanel({
   >(() => new Set());
   const [expandedPinnedPreview, setExpandedPinnedPreview] =
     React.useState(false);
+  const [archivedSectionExpanded, setArchivedSectionExpanded] =
+    React.useState(false);
 
   const pinnedIds = usePinnedConversationsStore(
     (state) =>
@@ -187,6 +197,48 @@ export function ConversationPanel({
   const togglePin = usePinnedConversationsStore((state) => state.togglePin);
   const pruneMissingPinnedConversations = usePinnedConversationsStore(
     (state) => state.pruneMissingConversations,
+  );
+
+  const archivedIds = useArchivedConversationsStore(
+    (state) =>
+      state.archivedByBackendId[activeBackend.id] ?? EMPTY_CONVERSATION_IDS,
+  );
+  const toggleArchive = useArchivedConversationsStore(
+    (state) => state.toggleArchive,
+  );
+  const pruneMissingArchived = useArchivedConversationsStore(
+    (state) => state.pruneMissingConversations,
+  );
+
+  const unreadIds = useUnreadConversationsStore(
+    (state) =>
+      state.unreadByBackendId[activeBackend.id] ?? EMPTY_CONVERSATION_IDS,
+  );
+  const toggleUnread = useUnreadConversationsStore(
+    (state) => state.toggleUnread,
+  );
+  const markRead = useUnreadConversationsStore((state) => state.markRead);
+  const pruneMissingUnread = useUnreadConversationsStore(
+    (state) => state.pruneMissingConversations,
+  );
+
+  const statusOverrides = useConversationStatusOverrideStore(
+    (state) =>
+      state.overridesByBackendId[activeBackend.id] ?? EMPTY_STATUS_OVERRIDES,
+  );
+  const setStatusOverride = useConversationStatusOverrideStore(
+    (state) => state.setStatus,
+  );
+  const clearStatusOverride = useConversationStatusOverrideStore(
+    (state) => state.clearStatus,
+  );
+  const pruneMissingStatusOverrides = useConversationStatusOverrideStore(
+    (state) => state.pruneMissingConversations,
+  );
+
+  const getStatusOverride = React.useCallback<StatusOverrideAccessor>(
+    (conversationId) => statusOverrides[conversationId],
+    [statusOverrides],
   );
 
   const toggleGroupCollapsed = React.useCallback((groupId: string) => {
@@ -261,24 +313,36 @@ export function ConversationPanel({
     });
   }, [data]);
 
+  // Archived conversations are pulled out of the bucketed/pinned lists and
+  // shown in a dedicated collapsible section at the bottom.
+  const { active: activeConversations, archived: archivedConversations } =
+    React.useMemo(
+      () => partitionArchivedConversations(conversations, archivedIds),
+      [conversations, archivedIds],
+    );
+
   const pinnedConversations = React.useMemo(
-    () => resolvePinnedConversations(pinnedIds, conversations),
-    [conversations, pinnedIds],
+    () => resolvePinnedConversations(pinnedIds, activeConversations),
+    [activeConversations, pinnedIds],
   );
 
   React.useEffect(() => {
     if (!isFetched) {
       return;
     }
-    pruneMissingPinnedConversations(
-      activeBackend.id,
-      conversations.map((conversation) => conversation.id),
-    );
+    const existingIds = conversations.map((conversation) => conversation.id);
+    pruneMissingPinnedConversations(activeBackend.id, existingIds);
+    pruneMissingArchived(activeBackend.id, existingIds);
+    pruneMissingUnread(activeBackend.id, existingIds);
+    pruneMissingStatusOverrides(activeBackend.id, existingIds);
   }, [
     activeBackend.id,
     conversations,
     isFetched,
     pruneMissingPinnedConversations,
+    pruneMissingArchived,
+    pruneMissingUnread,
+    pruneMissingStatusOverrides,
   ]);
 
   React.useEffect(() => {
@@ -290,8 +354,10 @@ export function ConversationPanel({
   const scopedConversations = React.useMemo(() => {
     const scopeFiltered =
       threadScope === "relevant"
-        ? conversations.filter((c) => isExecutionActive(c.execution_status))
-        : conversations;
+        ? activeConversations.filter((c) =>
+            isExecutionActive(c.execution_status),
+          )
+        : activeConversations;
 
     // In the expanded panel, pinned conversations should only appear inside
     // the dedicated pinned section (not duplicated in grouped/flat lists).
@@ -300,7 +366,7 @@ export function ConversationPanel({
     }
 
     return filterOutPinnedConversations(scopeFiltered, pinnedIds);
-  }, [compact, conversations, pinnedIds, threadScope]);
+  }, [compact, activeConversations, pinnedIds, threadScope]);
 
   const { recent: recentScoped, older: olderScoped } = React.useMemo(
     () => partitionByCutoff(scopedConversations),
@@ -367,12 +433,19 @@ export function ConversationPanel({
     if (!orderedConversationGroups) {
       return null;
     }
-    return bucketConversationGroupsByStatus(orderedConversationGroups);
-  }, [orderedConversationGroups]);
+    return bucketConversationGroupsByStatus(
+      orderedConversationGroups,
+      getStatusOverride,
+    );
+  }, [orderedConversationGroups, getStatusOverride]);
 
   const chronologicalStatusBuckets = React.useMemo(
-    () => bucketConversationsByStatus(sortedVisibleConversations),
-    [sortedVisibleConversations],
+    () =>
+      bucketConversationsByStatus(
+        sortedVisibleConversations,
+        getStatusOverride,
+      ),
+    [sortedVisibleConversations, getStatusOverride],
   );
 
   const conversationGroupIds = React.useMemo(
@@ -597,6 +670,9 @@ export function ConversationPanel({
       options?: { inPinnedSection?: boolean },
     ) => {
       const isPinned = pinnedIds.includes(conversation.id);
+      const isArchived = archivedIds.includes(conversation.id);
+      const isUnread = unreadIds.includes(conversation.id);
+      const statusOverride = statusOverrides[conversation.id] ?? null;
       if (compact) {
         return (
           <CompactConversationRow
@@ -658,7 +734,10 @@ export function ConversationPanel({
         >
           <NavigationLink
             to={`/conversations/${conversation.id}`}
-            onClick={onClose}
+            onClick={() => {
+              if (isUnread) markRead(activeBackend.id, conversation.id);
+              onClose?.();
+            }}
             className={cn(
               "block rounded-md transition-colors",
               openContextMenuId !== conversation.id &&
@@ -705,6 +784,21 @@ export function ConversationPanel({
               isPinned={isPinned}
               onTogglePin={() => togglePin(activeBackend.id, conversation.id)}
               alwaysShowPinIcon={isPinned && !options?.inPinnedSection}
+              isUnread={isUnread}
+              onToggleUnread={() =>
+                toggleUnread(activeBackend.id, conversation.id)
+              }
+              isArchived={isArchived}
+              onToggleArchive={() =>
+                toggleArchive(activeBackend.id, conversation.id)
+              }
+              statusOverride={statusOverride}
+              onSetStatus={(bucket) =>
+                setStatusOverride(activeBackend.id, conversation.id, bucket)
+              }
+              onClearStatus={() =>
+                clearStatusOverride(activeBackend.id, conversation.id)
+              }
             />
           </NavigationLink>
         </Tooltip>
@@ -720,10 +814,18 @@ export function ConversationPanel({
       onClose,
       openContextMenuId,
       pinnedIds,
+      archivedIds,
+      unreadIds,
+      statusOverrides,
       showRepoBranchMetadata,
       showLlmProfiles,
       showHoverMetadata,
       togglePin,
+      toggleArchive,
+      toggleUnread,
+      markRead,
+      setStatusOverride,
+      clearStatusOverride,
     ],
   );
 
@@ -924,6 +1026,38 @@ export function ConversationPanel({
               </section>
             ))}
           </div>
+        ) : null}
+
+        {!showInitialSkeleton &&
+        !compact &&
+        archivedConversations.length > 0 ? (
+          <section data-testid="conversation-panel-archived-section">
+            <button
+              type="button"
+              data-testid="conversation-panel-archived-toggle"
+              aria-expanded={archivedSectionExpanded}
+              onClick={() => setArchivedSectionExpanded((v) => !v)}
+              className="flex w-full items-center gap-2 px-2 pb-1 pt-3 text-xs font-semibold text-[var(--oh-muted)] hover:text-foreground"
+            >
+              {archivedSectionExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              )}
+              <Archive className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>{t(I18nKey.CONVERSATION_PANEL$ARCHIVED_SECTION)}</span>
+              <span className="rounded-full bg-[var(--oh-surface-raised)] px-1.5 py-px text-[10px] leading-4 text-[var(--oh-muted)]">
+                {archivedConversations.length}
+              </span>
+            </button>
+            {archivedSectionExpanded ? (
+              <div className="space-y-0.5">
+                {archivedConversations.map((conversation) =>
+                  renderConversationCard(conversation),
+                )}
+              </div>
+            ) : null}
+          </section>
         ) : null}
 
         {/* Explicit "Load more" trigger. Only shown when more pages exist

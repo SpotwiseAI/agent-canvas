@@ -110,9 +110,22 @@ function getTaggedStatusBucket(
   return null;
 }
 
+/** Resolves a manual per-conversation status override, if any. */
+export type StatusOverrideAccessor = (
+  conversationId: string,
+) => ConversationStatusBucketId | undefined;
+
 export function getConversationStatusBucket(
   conversation: AppConversation,
+  getOverride?: StatusOverrideAccessor,
 ): ConversationStatusBucketId {
+  // A user-set override wins over computed status so conversations can be
+  // moved between buckets manually.
+  const override = getOverride?.(conversation.id);
+  if (override) {
+    return override;
+  }
+
   const tagged = getTaggedStatusBucket(conversation.tags);
   if (tagged) {
     return tagged;
@@ -129,13 +142,16 @@ export function getConversationStatusBucket(
 
 export function bucketConversationsByStatus(
   conversations: readonly AppConversation[],
+  getOverride?: StatusOverrideAccessor,
 ): Array<{ id: ConversationStatusBucketId; conversations: AppConversation[] }> {
   const buckets = new Map<ConversationStatusBucketId, AppConversation[]>(
     CONVERSATION_STATUS_BUCKET_ORDER.map((id) => [id, []]),
   );
 
   for (const conversation of conversations) {
-    buckets.get(getConversationStatusBucket(conversation))?.push(conversation);
+    buckets
+      .get(getConversationStatusBucket(conversation, getOverride))
+      ?.push(conversation);
   }
 
   return CONVERSATION_STATUS_BUCKET_ORDER.map((id) => ({
@@ -144,11 +160,16 @@ export function bucketConversationsByStatus(
   })).filter((bucket) => bucket.conversations.length > 0);
 }
 
-function getGroupStatusBucket(group: {
-  conversations: readonly AppConversation[];
-}): ConversationStatusBucketId {
+function getGroupStatusBucket(
+  group: {
+    conversations: readonly AppConversation[];
+  },
+  getOverride?: StatusOverrideAccessor,
+): ConversationStatusBucketId {
   const bucketIds = new Set(
-    group.conversations.map(getConversationStatusBucket),
+    group.conversations.map((conversation) =>
+      getConversationStatusBucket(conversation, getOverride),
+    ),
   );
   return (
     CONVERSATION_STATUS_BUCKET_ORDER.find((bucketId) =>
@@ -161,13 +182,14 @@ export function bucketConversationGroupsByStatus<
   T extends { conversations: readonly AppConversation[] },
 >(
   groups: readonly T[],
+  getOverride?: StatusOverrideAccessor,
 ): Array<{ id: ConversationStatusBucketId; groups: T[] }> {
   const buckets = new Map<ConversationStatusBucketId, T[]>(
     CONVERSATION_STATUS_BUCKET_ORDER.map((id) => [id, []]),
   );
 
   for (const group of groups) {
-    buckets.get(getGroupStatusBucket(group))?.push(group);
+    buckets.get(getGroupStatusBucket(group, getOverride))?.push(group);
   }
 
   return CONVERSATION_STATUS_BUCKET_ORDER.map((id) => ({
@@ -202,6 +224,28 @@ export function filterOutPinnedConversations(
   return conversations.filter(
     (conversation) => !pinnedSet.has(conversation.id),
   );
+}
+
+/** Splits the list into active (shown in buckets) and archived conversations. */
+export function partitionArchivedConversations(
+  conversations: readonly AppConversation[],
+  archivedIds: readonly string[],
+): { active: AppConversation[]; archived: AppConversation[] } {
+  if (archivedIds.length === 0) {
+    return { active: [...conversations], archived: [] };
+  }
+
+  const archivedSet = new Set(archivedIds);
+  const active: AppConversation[] = [];
+  const archived: AppConversation[] = [];
+  for (const conversation of conversations) {
+    if (archivedSet.has(conversation.id)) {
+      archived.push(conversation);
+    } else {
+      active.push(conversation);
+    }
+  }
+  return { active, archived };
 }
 
 /** Subset of `useCreateConversation` variables for launching from a group row */

@@ -310,6 +310,48 @@ describe("conversation-panel-list-helpers", () => {
     ]);
   });
 
+  it("lets a manual status override win over tags and execution status", () => {
+    const finished: AppConversation = {
+      ...base,
+      id: "finished",
+      title: "finished",
+      execution_status: ExecutionStatus.FINISHED,
+    };
+    const tagged: AppConversation = {
+      ...base,
+      id: "tagged",
+      title: "tagged",
+      execution_status: ExecutionStatus.FINISHED,
+      tags: { status: "done" },
+    };
+
+    const getOverride = (id: string) =>
+      id === "finished"
+        ? ("done" as const)
+        : id === "tagged"
+          ? ("in_progress" as const)
+          : undefined;
+
+    // Override beats the FINISHED→in_review fallback...
+    expect(getConversationStatusBucket(finished, getOverride)).toBe("done");
+    // ...and beats an explicit server tag.
+    expect(getConversationStatusBucket(tagged, getOverride)).toBe("in_progress");
+    // No override → computed bucket is unchanged.
+    expect(getConversationStatusBucket(finished)).toBe("in_review");
+
+    expect(
+      bucketConversationsByStatus([finished, tagged], getOverride).map(
+        (bucket) => ({
+          id: bucket.id,
+          ids: bucket.conversations.map((conversation) => conversation.id),
+        }),
+      ),
+    ).toEqual([
+      { id: "in_progress", ids: ["tagged"] },
+      { id: "done", ids: ["finished"] },
+    ]);
+  });
+
   it("places a workspace group in the highest-priority status it contains", () => {
     const running: AppConversation = {
       ...base,
