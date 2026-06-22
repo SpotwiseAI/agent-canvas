@@ -559,6 +559,7 @@ export function BackendForm({
             setConnectionError(null);
           }}
           onBlur={() => setNameTouched(true)}
+          // eslint-disable-next-line i18next/no-literal-string -- example placeholder, not user-facing copy
           placeholder="Production"
           className="w-full"
           showRequiredTag
@@ -799,6 +800,7 @@ function ManualConnectionColumn({
             setName(value);
             setConnectionError(null);
           }}
+          // eslint-disable-next-line i18next/no-literal-string -- example placeholder, not user-facing copy
           placeholder="e.g. My Server"
           className="w-full"
         />
@@ -818,6 +820,7 @@ function ManualConnectionColumn({
             setHost(value);
             setConnectionError(null);
           }}
+          // eslint-disable-next-line i18next/no-literal-string -- example value, not translatable
           placeholder="http://localhost:8000"
           className="w-full"
         />
@@ -839,6 +842,7 @@ function ManualConnectionColumn({
           setApiKey(value);
           setConnectionError(null);
         }}
+        // eslint-disable-next-line i18next/no-literal-string -- example value, not translatable
         placeholder="sk-••••••••••"
         className="w-full"
       />
