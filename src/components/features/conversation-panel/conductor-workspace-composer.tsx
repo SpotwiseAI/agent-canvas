@@ -1,14 +1,30 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Folder, GitBranch } from "lucide-react";
+import {
+  ChevronDown,
+  Folder,
+  FolderPlus,
+  GitBranch,
+  Globe,
+} from "lucide-react";
 
 import { useCreateConversation } from "#/hooks/mutation/use-create-conversation";
 import { useNavigation } from "#/context/navigation-context";
 import { useIsCreatingConversation } from "#/hooks/use-is-creating-conversation";
+import { useResolvedWorkspaces } from "#/hooks/query/use-resolved-workspaces";
 import { I18nKey } from "#/i18n/declaration";
 import { cn } from "#/utils/utils";
+import {
+  dropdownMenuListClassName,
+  dropdownMenuRowClassName,
+  dropdownMenuRowIconWrapperClassName,
+} from "#/utils/dropdown-classes";
+import { Divider } from "#/ui/divider";
 import { ToggleSwitch } from "#/ui/toggle-switch";
 import { BrandButton } from "#/components/features/settings/brand-button";
+import { SwitchProfileButton } from "#/components/features/chat/switch-profile-button";
+import { OpenWorkspaceDialog } from "#/components/features/home/open-workspace-dialog";
+import RepoIcon from "#/icons/repo.svg?react";
 import { NEW_CONVERSATION_DROPDOWN_SURFACE } from "./new-conversation-dropdown-styles";
 
 /** The project/repo a composed conversation launches against. */
@@ -22,14 +38,14 @@ export interface ComposerSource {
 }
 
 interface ConductorWorkspaceComposerProps {
-  source: ComposerSource | null;
   anchor: { top: number; left: number };
+  width: number;
   onClose: () => void;
 }
 
 export function ConductorWorkspaceComposer({
-  source,
   anchor,
+  width,
   onClose,
 }: ConductorWorkspaceComposerProps) {
   const { t } = useTranslation("openhands");
@@ -39,16 +55,29 @@ export function ConductorWorkspaceComposer({
 
   const [task, setTask] = React.useState("");
   const [createMore, setCreateMore] = React.useState(false);
+  // `null` source = quick start (no working dir).
+  const [source, setSource] = React.useState<ComposerSource | null>(null);
+  const [sourceMenuOpen, setSourceMenuOpen] = React.useState(false);
+  const [dialogSource, setDialogSource] = React.useState<
+    "repo" | "workspace" | null
+  >(null);
 
+  const { workspaces } = useResolvedWorkspaces();
   const { mutate: createConversation, isPending } = useCreateConversation();
   const isCreatingElsewhere = useIsCreatingConversation();
   const isCreating = isPending || isCreatingElsewhere;
+
+  const dialogOpen = dialogSource !== null;
 
   React.useEffect(() => {
     textareaRef.current?.focus();
   }, []);
 
+  // While a nested popover (source menu) or the workspace dialog is open, the
+  // composer must not close on outside clicks/Escape — those interactions are
+  // "inside" the flow even though they render outside `rootRef`.
   React.useEffect(() => {
+    if (sourceMenuOpen || dialogOpen) return undefined;
     const onDown = (event: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
         onClose();
@@ -63,13 +92,20 @@ export function ConductorWorkspaceComposer({
       document.removeEventListener("mousedown", onDown);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, sourceMenuOpen, dialogOpen]);
 
   const create = () => {
     if (isCreating) return;
     const query = task.trim() || undefined;
+    const workingDir = source?.workingDir;
     createConversation(
-      { workingDir: source?.workingDir, query },
+      {
+        workingDir,
+        // A picked workspace launches in an isolated per-task worktree;
+        // quick start has no working dir and therefore no worktree.
+        workspaceMode: workingDir ? "new_worktree" : undefined,
+        query,
+      },
       {
         onSuccess: (data) => {
           if (createMore) {
@@ -95,32 +131,152 @@ export function ConductorWorkspaceComposer({
     }
   };
 
+  const selectSource = (next: ComposerSource | null) => {
+    setSource(next);
+    setSourceMenuOpen(false);
+  };
+
+  const sourceLabel =
+    source?.label ?? t(I18nKey.CONVERSATION_PANEL$QUICK_START);
+
   return (
     <div
       ref={rootRef}
       data-testid="conductor-workspace-composer"
-      className={cn(NEW_CONVERSATION_DROPDOWN_SURFACE, "w-[320px] p-3")}
-      style={{ position: "fixed", top: anchor.top, left: anchor.left }}
+      className={cn(NEW_CONVERSATION_DROPDOWN_SURFACE, "p-3")}
+      style={{ position: "fixed", top: anchor.top, left: anchor.left, width }}
     >
-      <div className="mb-2 flex items-center gap-1.5 text-xs text-[var(--oh-muted)]">
-        {source ? (
-          <>
+      {/* Source selector ("Create from…") */}
+      <div className="relative mb-2">
+        <button
+          type="button"
+          data-testid="conductor-workspace-composer-source"
+          aria-haspopup="menu"
+          aria-expanded={sourceMenuOpen}
+          onClick={() => setSourceMenuOpen((value) => !value)}
+          className={cn(
+            "flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs",
+            "text-[var(--oh-muted)] transition-colors hover:bg-[var(--oh-surface-raised)]",
+          )}
+        >
+          {source ? (
             <Folder size={13} className="shrink-0" aria-hidden />
-            <span className="truncate font-medium text-foreground">
-              {source.label}
-            </span>
-            {source.branch ? (
-              <span className="flex min-w-0 items-center gap-1">
-                <GitBranch size={12} className="shrink-0" aria-hidden />
-                <span className="truncate">{source.branch}</span>
-              </span>
-            ) : null}
-          </>
-        ) : (
-          <span className="font-medium text-foreground">
-            {t(I18nKey.CONVERSATION_PANEL$QUICK_START)}
+          ) : (
+            <FolderPlus size={13} className="shrink-0" aria-hidden />
+          )}
+          <span className="truncate font-medium text-foreground">
+            {sourceLabel}
           </span>
-        )}
+          {source?.branch ? (
+            <span className="flex min-w-0 items-center gap-1">
+              <GitBranch size={12} className="shrink-0" aria-hidden />
+              <span className="truncate">{source.branch}</span>
+            </span>
+          ) : null}
+          <ChevronDown size={13} className="ml-auto shrink-0" aria-hidden />
+        </button>
+
+        {sourceMenuOpen ? (
+          <div
+            data-testid="conductor-workspace-composer-source-menu"
+            className={cn(
+              NEW_CONVERSATION_DROPDOWN_SURFACE,
+              "absolute left-0 right-0 top-full z-10 mt-1",
+            )}
+          >
+            <ul
+              className={cn(
+                "max-h-[40vh] overflow-y-auto sm:max-h-[240px]",
+                dropdownMenuListClassName,
+              )}
+            >
+              <li>
+                <button
+                  type="button"
+                  data-testid="conductor-source-quick-start"
+                  onClick={() => selectSource(null)}
+                  className={dropdownMenuRowClassName}
+                >
+                  <span
+                    className={dropdownMenuRowIconWrapperClassName}
+                    aria-hidden
+                  >
+                    <FolderPlus size={16} aria-hidden />
+                  </span>
+                  <span className="truncate">
+                    {t(I18nKey.CONVERSATION_PANEL$QUICK_START)}
+                  </span>
+                </button>
+              </li>
+              {workspaces.map((workspace) => (
+                <li key={workspace.id}>
+                  <button
+                    type="button"
+                    data-testid="conductor-source-workspace"
+                    data-workspace-path={workspace.path}
+                    onClick={() =>
+                      selectSource({
+                        label: workspace.name,
+                        workingDir: workspace.path,
+                      })
+                    }
+                    className={dropdownMenuRowClassName}
+                  >
+                    <span
+                      className={dropdownMenuRowIconWrapperClassName}
+                      aria-hidden
+                    >
+                      <RepoIcon width={14} height={14} />
+                    </span>
+                    <span className="truncate">{workspace.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <div className={cn("flex flex-col", dropdownMenuListClassName)}>
+              <Divider inset="menu" />
+              <button
+                type="button"
+                data-testid="conductor-source-open-project"
+                onClick={() => {
+                  setSourceMenuOpen(false);
+                  setDialogSource("workspace");
+                }}
+                className={dropdownMenuRowClassName}
+              >
+                <span
+                  className={dropdownMenuRowIconWrapperClassName}
+                  aria-hidden
+                >
+                  <Folder size={16} aria-hidden />
+                </span>
+                <span className="truncate">
+                  {t(I18nKey.CONVERSATION_PANEL$OPEN_PROJECT)}
+                </span>
+              </button>
+              <button
+                type="button"
+                data-testid="conductor-source-open-github-project"
+                onClick={() => {
+                  setSourceMenuOpen(false);
+                  setDialogSource("repo");
+                }}
+                className={dropdownMenuRowClassName}
+              >
+                <span
+                  className={dropdownMenuRowIconWrapperClassName}
+                  aria-hidden
+                >
+                  <Globe size={16} aria-hidden />
+                </span>
+                <span className="truncate">
+                  {t(I18nKey.CONVERSATION_PANEL$OPEN_GITHUB_PROJECT)}
+                </span>
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <textarea
@@ -139,28 +295,43 @@ export function ConductorWorkspaceComposer({
       />
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => setCreateMore((value) => !value)}
-          className="flex items-center gap-2 text-xs text-[var(--oh-muted)]"
-        >
-          <ToggleSwitch
-            enabled={createMore}
-            label={t(I18nKey.CONVERSATION_PANEL$CREATE_MORE)}
-            onToggle={() => setCreateMore((value) => !value)}
-          />
-          {t(I18nKey.CONVERSATION_PANEL$CREATE_MORE)}
-        </button>
-        <BrandButton
-          type="button"
-          variant="primary"
-          testId="conductor-workspace-composer-create"
-          isDisabled={isCreating}
-          onClick={create}
-        >
-          {t(I18nKey.BUTTON$CREATE)}
-        </BrandButton>
+        <div className="flex min-w-0 items-center gap-2">
+          <SwitchProfileButton />
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setCreateMore((value) => !value)}
+            className="flex items-center gap-2 text-xs text-[var(--oh-muted)]"
+          >
+            <ToggleSwitch
+              enabled={createMore}
+              label={t(I18nKey.CONVERSATION_PANEL$CREATE_MORE)}
+              onToggle={() => setCreateMore((value) => !value)}
+            />
+            {t(I18nKey.CONVERSATION_PANEL$CREATE_MORE)}
+          </button>
+          <BrandButton
+            type="button"
+            variant="primary"
+            testId="conductor-workspace-composer-create"
+            isDisabled={isCreating}
+            onClick={create}
+          >
+            {t(I18nKey.BUTTON$CREATE)}
+          </BrandButton>
+        </div>
       </div>
+
+      <OpenWorkspaceDialog
+        isOpen={dialogOpen}
+        initialSource={dialogSource ?? undefined}
+        onClose={() => setDialogSource(null)}
+        onConfirm={(workspace) => {
+          setDialogSource(null);
+          setSource({ label: workspace.name, workingDir: workspace.path });
+        }}
+      />
     </div>
   );
 }

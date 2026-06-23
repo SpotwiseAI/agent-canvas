@@ -5,44 +5,11 @@ import { renderWithProviders } from "test-utils";
 import { ConductorNewWorkspaceMenu } from "#/components/features/conversation-panel/conductor-new-workspace-menu";
 
 describe("ConductorNewWorkspaceMenu", () => {
-  it("opens a three-item menu", async () => {
+  it("opens the composer directly when the + button is clicked", async () => {
     const user = userEvent.setup();
     renderWithProviders(<ConductorNewWorkspaceMenu />);
 
     await user.click(screen.getByTestId("conductor-new-workspace-button"));
-
-    expect(
-      screen.getByTestId("conductor-new-workspace-open-project"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("conductor-new-workspace-open-github-project"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("conductor-new-workspace-quick-start"),
-    ).toBeInTheDocument();
-  });
-
-  it("opens the GitHub repository picker only (no local-folder section)", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<ConductorNewWorkspaceMenu />);
-
-    await user.click(screen.getByTestId("conductor-new-workspace-button"));
-    await user.click(
-      screen.getByTestId("conductor-new-workspace-open-github-project"),
-    );
-
-    expect(
-      screen.getByTestId("open-workspace-dialog-body"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("local-repository-form")).toBeInTheDocument();
-  });
-
-  it("opens the composer when quick start is chosen", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<ConductorNewWorkspaceMenu />);
-
-    await user.click(screen.getByTestId("conductor-new-workspace-button"));
-    await user.click(screen.getByTestId("conductor-new-workspace-quick-start"));
 
     expect(
       screen.getByTestId("conductor-workspace-composer"),
@@ -50,5 +17,39 @@ describe("ConductorNewWorkspaceMenu", () => {
     expect(
       screen.getByTestId("conductor-workspace-composer-input"),
     ).toBeInTheDocument();
+  });
+
+  it("exposes source options inside the composer", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ConductorNewWorkspaceMenu />);
+
+    await user.click(screen.getByTestId("conductor-new-workspace-button"));
+    await user.click(screen.getByTestId("conductor-workspace-composer-source"));
+
+    expect(
+      screen.getByTestId("conductor-source-quick-start"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("conductor-source-open-project"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("conductor-source-open-github-project"),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the GitHub repository picker from the source menu", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ConductorNewWorkspaceMenu />);
+
+    await user.click(screen.getByTestId("conductor-new-workspace-button"));
+    await user.click(screen.getByTestId("conductor-workspace-composer-source"));
+    await user.click(
+      screen.getByTestId("conductor-source-open-github-project"),
+    );
+
+    expect(
+      screen.getByTestId("open-workspace-dialog-body"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("local-repository-form")).toBeInTheDocument();
   });
 });
