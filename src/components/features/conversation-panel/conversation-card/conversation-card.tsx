@@ -20,8 +20,10 @@ import { ConversationCardFooter } from "./conversation-card-footer";
 import { ConversationStatusBadges } from "./conversation-status-badges";
 import { ConversationSourceBadges } from "./conversation-source-badges";
 import { ConductorRowContextMenu } from "./conductor-row-context-menu";
+import { ConversationDiffStatChip } from "./conversation-diff-stat-chip";
 import type { ConversationStatusBucketId } from "../conversation-panel-list-helpers";
 import { useDownloadConversation } from "#/hooks/use-download-conversation";
+import { useConversationDiffStat } from "#/hooks/query/use-conversation-diff-stat";
 
 const RIGHT_CLICK_MENU_WIDTH = 240;
 const RIGHT_CLICK_MENU_HEIGHT = 300;
@@ -105,6 +107,13 @@ export function ConversationCard({
     left: number;
   } | null>(null);
   const { mutateAsync: downloadConversation } = useDownloadConversation();
+
+  const diffStat = useConversationDiffStat({
+    conversationId,
+    selectedRepository: selectedRepository?.selected_repository,
+    workingDir: workspaceWorkingDir,
+    sandboxStatus,
+  });
 
   const onTitleSave = (newTitle: string) => {
     if (newTitle !== "" && newTitle !== title) {
@@ -276,18 +285,24 @@ export function ConversationCard({
             contextMenuOpen && "min-w-[3.75rem]",
           )}
         >
-          {!showPersistentPinIcon && (createdAt ?? lastUpdatedAt) && (
-            <p
-              className={cn(
-                "text-xs text-[var(--oh-muted)] text-right whitespace-nowrap transition-opacity -translate-x-1.5",
-                hasHoverActions &&
-                  "group-hover:opacity-0 group-focus-within:opacity-0",
-                contextMenuOpen && "opacity-0",
-              )}
-            >
-              <time>{formatTimeDelta(lastUpdatedAt ?? createdAt)}</time>
-            </p>
-          )}
+          {!showPersistentPinIcon &&
+            (diffStat || createdAt || lastUpdatedAt) && (
+              <div
+                className={cn(
+                  "flex items-center gap-1.5 whitespace-nowrap transition-opacity -translate-x-1.5",
+                  hasHoverActions &&
+                    "group-hover:opacity-0 group-focus-within:opacity-0",
+                  contextMenuOpen && "opacity-0",
+                )}
+              >
+                {diffStat ? <ConversationDiffStatChip stat={diffStat} /> : null}
+                {(createdAt ?? lastUpdatedAt) ? (
+                  <p className="text-right text-xs text-[var(--oh-muted)]">
+                    <time>{formatTimeDelta(lastUpdatedAt ?? createdAt)}</time>
+                  </p>
+                ) : null}
+              </div>
+            )}
 
           {hasHoverActions ? (
             <div
