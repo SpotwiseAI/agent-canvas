@@ -107,7 +107,9 @@ RUN uv pip install --system "openhands-automation==${AUTOMATION_VERSION}" 2>/dev
 # agentServer pin. The smoke-test import fails the build if the patch is
 # incompatible with the installed SDK.
 COPY docker/patches/openhands-sdk-git/git_changes.py docker/patches/openhands-sdk-git/models.py /tmp/oh-sdk-git-patch/
-RUN GITDIR="$(python3 -c 'import os, openhands.sdk.git as g; print(os.path.dirname(g.__file__))')" \
+# Resolve the dir via a real submodule file (openhands.sdk.git is a PEP 420
+# namespace package whose __file__ is None, so dirname(__file__) would fail).
+RUN GITDIR="$(python3 -c 'import os, openhands.sdk.git.git_changes as m; print(os.path.dirname(m.__file__))')" \
     && cp /tmp/oh-sdk-git-patch/git_changes.py "$GITDIR/git_changes.py" \
     && cp /tmp/oh-sdk-git-patch/models.py "$GITDIR/models.py" \
     && python3 -c 'from openhands.sdk.git.git_changes import get_git_changes; from openhands.sdk.git.models import GitChange; assert "additions" in GitChange.model_fields and "deletions" in GitChange.model_fields' \
