@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoutesStub } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
-import App, { links } from "#/root";
+import App, { links, HydrateFallback } from "#/root";
 import { server } from "#/mocks/node";
 import { __resetActiveStoreForTests } from "#/api/backend-registry/active-store";
 import { ActiveBackendProvider } from "#/contexts/active-backend-context";
@@ -259,5 +259,16 @@ describe("App root document links", () => {
       type: "image/svg+xml",
       href: "/favicon.svg",
     });
+  });
+});
+
+describe("App root hydration fallback", () => {
+  it("renders the branded bootstrap spinner instead of a blank screen", () => {
+    // React Router renders HydrateFallback during initial hydration; it must
+    // not depend on query/i18n providers (unmounted at that point) and must
+    // show something so a deep URL doesn't flash blank white.
+    render(<HydrateFallback />);
+
+    expect(screen.getByTestId("loading-spinner")).toBeInTheDocument();
   });
 });

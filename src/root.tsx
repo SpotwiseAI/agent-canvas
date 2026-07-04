@@ -163,6 +163,16 @@ export const meta: MetaFunction = () => [
   { name: "description", content: "Let's Start Building!" },
 ];
 
+// React Router framework mode renders this during the initial client-hydration
+// window — while JS modules load and any clientLoader runs. Without it, opening
+// or reloading a deep URL (e.g. a conversation) shows a blank white screen
+// until hydration resolves (seconds for a large transcript), which reads as
+// "stuck loading". Reuse the branded bootstrap spinner; it is self-contained
+// (no query/i18n providers, which aren't mounted yet at this point).
+export function HydrateFallback() {
+  return <AgentServerBootstrapLoading />;
+}
+
 export default function App() {
   // Flag-based gate: in public mode (VITE_AUTH_REQUIRED=true) with no
   // session key yet, show the auth screen immediately — no network
